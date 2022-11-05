@@ -13,6 +13,7 @@ public class Shape implements Serializable {
 
 	protected static Shape.Type Type;
 	private static Color currentColor = Color.BLACK;
+	public static int DEFAULT_SIZE = 30;
 
 	private boolean selected;
 	private RectangularShape render;

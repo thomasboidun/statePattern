@@ -16,131 +16,150 @@ import java.util.ConcurrentModificationException;
 
 import javax.swing.JPanel;
 
-/**
- * @param DrawingPanel
- *                         tableau contenant les coordonner de dessin a
- *                         selectionner
- * @param shapeList
- *                         Tableau contenant les formes geometriques
- * @param currentshape
- *                         lorsqu'un figure est selectionner
- * @param lastPointPressed
- *                         le point precedent
- * @param allSelected
- *                         une facon pour faire la verification en cas ou on a
- *                         selectionner
- *                         ou nom voir mouseDragged
- * @param allSelected
- *                         sert a montre si tout est selectionner une methode
- *                         cree pour
- *                         verifier
- * 
- */
 public class DrawingPanel extends JPanel {
 
-	private ArrayList<Shape> shapeList;
-	private ArrayList<Shape> selectedShapeList;
-	private Shape currentshape;
-	private Point2D lastPointPressed;
+	private class MouseHandler extends MouseAdapter {
+		private DrawingPanel drawingPanel;
+
+		public MouseHandler(DrawingPanel drawingPanel) {
+			this.drawingPanel = drawingPanel;
+		}
+
+		public void mousePressed(MouseEvent event) {
+			Point point = event.getPoint();
+			currentShape = findShapeByPoint(point);
+			lastPointPressed = point;
+			lastShape = null;
+		}
+
+		public void mouseClicked(MouseEvent event) {
+			changeSelectionState(new OneSelectionState(drawingPanel));
+		}
+	}
+
+	private class MouseMotionHandler implements MouseMotionListener {
+		public void mouseMoved(MouseEvent event) {
+			if (findShapeByPoint(event.getPoint()) == null)
+				setCursor(Cursor.getDefaultCursor());
+			else
+				setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
+		}
+
+		public void mouseDragged(MouseEvent event) {
+			Point p = event.getPoint();
+			if (currentShape == null) {
+				if (lastShape == null) {
+					lastShape = new Shape(shapeType);
+					lastShape.setColor(Shape.getCurrentColor());
+					addToShapes(lastShape);
+				}
+				lastShape.setFrameFromDiagonal(lastPointPressed, p);
+			} else {
+				double dx = p.getX() - lastPointPressed.getX();
+				double dy = p.getY() - lastPointPressed.getY();
+				if (!selectedShapes.contains(currentShape)) {
+					currentShape.moveBy(dx, dy);
+				}
+				try {
+					for (Shape f : selectedShapes) {
+						f.moveBy(dx, dy);
+						if (!allShapesAreSelected()) {
+							if (selectedShapes.size() >= 0)
+								selectedShapes.clear();
+						}
+					}
+				} catch (ConcurrentModificationException e) {
+					System.out.print(e);
+				}
+				lastPointPressed = p;
+			}
+			repaint();
+		}
+	}
+
+	private String file = ".";
+	private SelectionState selectionState;
+	private ArrayList<Shape> shapes = new ArrayList<Shape>();
+	private ArrayList<Shape> selectedShapes = new ArrayList<Shape>();
+	private Shape currentShape = null;
 	private Shape lastShape = null;
-	private String lastFile = ".";
-	private int allSelected;
-	private Color color;
-	private int DEFAULT_SHAPE_SIZE = 30;
+	private Point2D lastPointPressed = null;
 	private Shape.Type shapeType = Shape.Type.RECTANGLE;
-	private Object object;
-	private int key;
+	private Object object = null;
 
 	public DrawingPanel() {
-		this.shapeList = new ArrayList<Shape>();
-		this.selectedShapeList = new ArrayList<Shape>();
-		this.currentshape = null;
-		this.addMouseListener(new MouseHandler());
+		this.selectionState = new NoSelectionState(this);
+		this.addMouseListener(new MouseHandler(this));
 		this.addMouseMotionListener(new MouseMotionHandler());
 	}
 
-	public void setLastFile(String lastFile) {
-		this.lastFile = lastFile;
+	// GETTERS & SETTERS
+
+	public String getFile() {
+		return this.file;
 	}
 
-	public String getLastFile() {
-		return this.lastFile;
+	public void setFile(String file) {
+		this.file = file;
 	}
 
-	public void clearAllFromShapeListAndSelectedShapeList() {
-		this.clearSelectedShapeList();
-		this.shapeList.clear();
-		this.paintComponent(this.getGraphics());
+	public void changeSelectionState(SelectionState state) {
+		this.selectionState = state;
 	}
 
-	public void clearSelectedShapeList() {
-		for (Shape shape : selectedShapeList) {
-			shape.setSelected(false);
-		}
-		this.selectedShapeList.clear();
-		this.repaint();
+	public SelectionState getSelectionState() {
+		return this.selectionState;
 	}
 
-	public void deleteAllOfSelectedShapeList() {
-		for (Shape shape : selectedShapeList) {
-			this.removeFromShapeList(shape);
-		}
-		this.selectedShapeList.clear();
-		this.repaint();
+	public ArrayList<Shape> getShapes() {
+		return this.shapes;
 	}
 
-	public void selectAllShapes() {
-		this.allSelected = 1;
-		this.selectedShapeList.clear();
-		this.selectedShapeList.addAll(this.shapeList);
-		for (Shape shape : this.selectedShapeList) {
+	public ArrayList<Shape> getSelectedShapes() {
+		return this.selectedShapes;
+	}
+
+	public void setSelectedShapes(ArrayList<Shape> shapes) {
+		this.selectedShapes.clear();
+		this.selectedShapes.addAll(shapes);
+		for (Shape shape : this.selectedShapes) {
 			shape.setSelected(true);
 		}
-		this.repaint();
 	}
 
-	public void coloreAllSelectedShape() {
-		Color color = Shape.getCurrentColor();
-		for (Shape shape : this.selectedShapeList) {
-			shape.setColor(color);
-		}
-		paintComponent(getGraphics());
+	public Shape getCurrentShape() {
+		return this.currentShape;
 	}
 
-	public void setShapeCurrentColor(Color color) {
-		Shape.setCurrentColor(color);
+	public void setCurrentShape(Shape shape) {
+		this.currentShape = shape;
+	}
+
+	public Shape getLastShape() {
+		return this.lastShape;
+	}
+
+	public void setLastShape(Shape shape) {
+		this.currentShape = shape;
+	}
+
+	public Point2D getLastPointPressed() {
+		return this.lastPointPressed;
+	}
+
+	public void setLastPointPressed(Point point) {
+		this.lastPointPressed = point;
+	}
+
+	public Shape.Type getShapeType() {
+		return this.shapeType;
 	}
 
 	public void setShapeType(Shape.Type type) {
 		this.shapeType = type;
 	}
 
-	public Shape findShapeByPointFromShapeList(Point2D point) {
-		for (Shape shape : shapeList) {
-			if (shape.contains(point)) {
-				return shape;
-			}
-		}
-		return null;
-	}
-
-	public void paintComponent(Graphics graphics) {
-		super.paintComponent(graphics);
-		Graphics2D g2 = (Graphics2D) graphics;
-		for (Shape shape : shapeList) {
-			shape.draw(g2);
-			if (currentshape != null) {
-				this.addSelectionMarks(g2, currentshape);
-				this.repaint();
-			}
-			if (allSelected == 1) {
-				for (Shape selec : selectedShapeList) {
-					this.addSelectionMarks(g2, selec);
-					this.repaint();
-				}
-			}
-		}
-	}
+	// Utils
 
 	public void addSelectionMarks(Graphics2D g2D, Shape f) {
 		double x = f.getX();
@@ -158,100 +177,112 @@ public class DrawingPanel extends JPanel {
 
 	}
 
-	public void addToShapeList(Shape shape) {
-		this.shapeList.add(shape);
+	public void addToSelectedShapes(Shape shape) {
+		this.selectedShapes.add(shape);
 	}
 
-	public void removeFromShapeList(Shape shape) {
-		this.shapeList.remove(shape);
+	public void addToShapes(Shape shape) {
+		this.shapes.add(shape);
 	}
 
-	private class MouseHandler extends MouseAdapter {
-		public void mousePressed(MouseEvent event) {
-			Point point = event.getPoint();
-			currentshape = findShapeByPointFromShapeList(point);
-			lastPointPressed = point;
-			lastShape = null;
+	public boolean allShapesAreSelected() {
+		return this.shapes.size() == this.selectedShapes.size();
+	}
+
+	public void clearSelectedShapes() {
+		this.currentShape = null;
+		this.lastShape = null;
+		this.lastPointPressed = null;
+
+		for (Shape shape : selectedShapes) {
+			shape.setSelected(false);
 		}
 
-		public void mouseClicked(MouseEvent event) {
-			allSelected = 0;
-			Point point = event.getPoint();
-			double x = point.getX();
-			double y = point.getY();
-			if (currentshape == null && lastShape == null) {
-				Shape shape = new Shape(
-						shapeType, x - DEFAULT_SHAPE_SIZE / 2,
-						y - DEFAULT_SHAPE_SIZE / 2,
-						DEFAULT_SHAPE_SIZE,
-						DEFAULT_SHAPE_SIZE);
-				shape.setColor(Shape.getCurrentColor());
-				addToShapeList(shape);
-			} else {
-				if (!selectedShapeList.contains(currentshape)) {
-					currentshape.setSelected(true);
-					selectedShapeList.add(currentshape);
+		this.selectedShapes.clear();
+		this.repaint();
+	}
+
+	public void clearShapesAndSelectedShapes() {
+		this.clearSelectedShapes();
+		this.shapes.clear();
+		this.paintComponent(this.getGraphics());
+	}
+
+	// public void coloreSelectedShapes() {
+	// 	Color color = Shape.getCurrentColor();
+	// 	for (Shape shape : this.selectedShapes) {
+	// 		shape.setColor(color);
+	// 	}
+	// 	paintComponent(getGraphics());
+	// }
+
+	public Shape findShapeByPoint(Point2D point) {
+		for (Shape shape : shapes) {
+			if (shape.contains(point)) {
+				return shape;
+			}
+		}
+		return null;
+	}
+
+	public void openFile(ObjectInputStream in) {
+		try {
+			shapes.clear();
+			object = in.readObject();
+			while (object != null) {
+				if (object != null) {
+					shapes.add((Shape) object);
+					object = in.readObject();
 				}
 			}
+			in.close();
+			repaint();
+		} catch (IOException | ClassNotFoundException e) {
+			shapes.add((Shape) object);
 			repaint();
 		}
 	}
 
-	/**
-	 * Lorsque on appui sur Maj(shift) enfonce.
-	 * 
-	 * @exception ConcurrentModificationException
-	 *                                            Cette exception peut être levée
-	 *                                            par les méthodes qui ont détecté
-	 *                                            une modification
-	 *                                            concurrente d'un objet lorsque
-	 *                                            cette modification n'est pas
-	 *                                            autorisée.
-	 *                                            "http://docs.oracle.com/javase/7/docs/api/java/util/ConcurrentModificationException.html"
-	 */
-	private class MouseMotionHandler implements MouseMotionListener {
-		public void mouseMoved(MouseEvent event) {
-			if (findShapeByPointFromShapeList(event.getPoint()) == null)
-				setCursor(Cursor.getDefaultCursor());
-			else
-				setCursor(Cursor.getPredefinedCursor(Cursor.CROSSHAIR_CURSOR));
-		}
-
-		public void mouseDragged(MouseEvent event) {
-			Point p = event.getPoint();
-			if (currentshape == null) {
-				if (lastShape == null) {
-					lastShape = new Shape(shapeType);
-					lastShape.setColor(Shape.getCurrentColor());
-					addToShapeList(lastShape);
-				}
-				lastShape.setFrameFromDiagonal(lastPointPressed, p);
-			} else {
-				double dx = p.getX() - lastPointPressed.getX();
-				double dy = p.getY() - lastPointPressed.getY();
-				if (!selectedShapeList.contains(currentshape)) {
-					currentshape.moveBy(dx, dy);
-				}
-				try {
-					for (Shape f : selectedShapeList) {
-						f.moveBy(dx, dy);
-						if (allSelected != 1) {
-							if (selectedShapeList.size() >= 0)
-								selectedShapeList.clear();
-						}
-					}
-				} catch (ConcurrentModificationException e) {
-					allSelected = 0;
-				}
-				lastPointPressed = p;
+	public void paintComponent(Graphics graphics) {
+		super.paintComponent(graphics);
+		Graphics2D g2 = (Graphics2D) graphics;
+		for (Shape shape : shapes) {
+			shape.draw(g2);
+			if (currentShape != null) {
+				this.addSelectionMarks(g2, currentShape);
+				this.repaint();
 			}
-			repaint();
+			if (this.allShapesAreSelected()) {
+				for (Shape selec : selectedShapes) {
+					this.addSelectionMarks(g2, selec);
+					this.repaint();
+				}
+			}
 		}
 	}
+
+	public void removeFromShapes(Shape shape) {
+		this.shapes.remove(shape);
+	}
+
+	// public void removeSelectedShapes() {
+	// 	if(this.allShapesAreSelected()) {
+	// 		for (Shape shape : this.shapes) {
+	// 			this.removeFromShapes(shape);
+	// 		}
+	// 	} else {
+	// 		this.removeFromShapes(this.findShapeByPoint(this.lastPointPressed));
+	// 	}
+		
+	// 	this.selectedShapes.clear();
+
+	// 	this.repaint();
+	// 	this.changeSelectionState(new NoSelectionState(this));
+	// }
 
 	public void saveFile(ObjectOutputStream out) {
 		try {
-			for (Shape f : shapeList) {
+			for (Shape f : shapes) {
 				f.setSelected(true);
 				out.writeObject(f);
 			}
@@ -259,23 +290,17 @@ public class DrawingPanel extends JPanel {
 			System.exit(1);
 		}
 	}
-	
-	public void openFile(ObjectInputStream in) {
-		try {
-			shapeList.clear();
-			object = in.readObject();
-			while (object != null) {
-				if (object != null) {
-					shapeList.add((Shape) object);
-					object = in.readObject();
-				}
-			}
-			in.close();
-			repaint();
-		}
-		catch (IOException | ClassNotFoundException e) {
-			shapeList.add((Shape) object);
-			repaint();
-		}
+
+	// public void selectAllShapes() {
+	// 	this.selectedShapes.clear();
+	// 	this.selectedShapes.addAll(this.shapes);
+	// 	for (Shape shape : this.selectedShapes) {
+	// 		shape.setSelected(true);
+	// 	}
+	// 	this.repaint();
+	// }
+
+	public void setShapeCurrentColor(Color color) {
+		Shape.setCurrentColor(color);
 	}
 }

@@ -1,27 +1,23 @@
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
-import java.awt.EventQueue;
 import java.awt.FlowLayout;
-import java.awt.Graphics;
-import java.awt.Graphics2D;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.ItemEvent;
 import java.awt.event.ItemListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
-import java.awt.geom.Rectangle2D;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+
 import javax.swing.ButtonGroup;
 import javax.swing.ImageIcon;
 import javax.swing.JColorChooser;
-import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -32,43 +28,102 @@ import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.KeyStroke;
 
-public class App {
-
-	public static void main(String[] args) {
-		EventQueue.invokeLater(new Runnable() {
-			public void run() {
-				DrawingFrame application = new DrawingFrame("Paint Drawing");
-				application.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-
-				application.setSize(800, 600);
-				application.setVisible(true);
-
-			}
-		});
-	}
-}
-
-class DrawingFrame extends JFrame {
+class App extends JFrame {
 	private DrawingPanel drawingPanel;
-	private ColorPalette colorpalette;
+	private ColorPalette colorPalette;
 
-	public DrawingFrame(String title) {
-		setTitle(title);
-		drawingPanel = new DrawingPanel();
-		drawingPanel.setShapeCurrentColor(Color.BLACK);
-		drawingPanel.setBackground(Color.WHITE);
-		this.add(drawingPanel, BorderLayout.CENTER);
+	public App(String title) {
+		System.out.println("Start of the initialization of the application...");
+
+		this.setTitle(title);
+
+		this.drawingPanel = new DrawingPanel();
+		this.drawingPanel.setShapeCurrentColor(Color.BLACK);
+		this.drawingPanel.setBackground(Color.WHITE);
+
+		this.add(this.drawingPanel, BorderLayout.CENTER);
 		this.add(new JLabel("Click and drag for draw."), BorderLayout.SOUTH);
 
 		JMenuBar topMenu = new JMenuBar();
-		setJMenuBar(topMenu);
+		this.setJMenuBar(topMenu);
 
-		JMenu fileMenu = new JMenu("File");
-		topMenu.add(fileMenu);
+		JMenu fileMenu = this.addMenu("File");
+		this.addMenuItem("Open", "ctrl O", this.getOpenAction(), fileMenu, false);
+		this.addMenuItem("Save", "ctrl S", this.getSaveAction(), fileMenu, true);
+		this.addMenuItem("Delete", "ctrl D", this.getDeleteAction(), fileMenu, false);
 
-		JMenuItem openItem = new JMenuItem("Open");
-		openItem.setAccelerator(KeyStroke.getKeyStroke("ctrl O"));
-		openItem.addActionListener(new ActionListener() {
+		JMenu selectionMenu = this.addMenu("Selection");
+		this.addMenuItem("Select All", "ctrl A", this.getSelectAllAction(), selectionMenu, false);
+		this.addMenuItem("No selection", "ESCAPE", this.getNoSelectionAction(), selectionMenu, false);
+		this.addMenuItem("Colore selection", "ctrl C", this.getColoreSelectionAction(), selectionMenu, false);
+		this.addMenuItem("Remove selection", "BACK_SPACE", this.getRemoveSelectionAction(), selectionMenu, false);
+
+		this.addToolsBar();
+
+		System.out.println("End of the initialization of the application.");
+	}
+
+	private JMenu addMenu(String name) {
+		return this.getJMenuBar().add(new JMenu(name));
+	}
+
+	private void addMenuItem(String name, String accelerator, ActionListener action, JMenu menu, boolean separator) {
+		JMenuItem menuItem = new JMenuItem(name);
+		menuItem.setAccelerator(KeyStroke.getKeyStroke(accelerator));
+		menuItem.addActionListener(action);
+		menu.add(menuItem);
+		if (separator) {
+			menu.addSeparator();
+		}
+	}
+
+	private void addToolsBar() {
+		JPanel toolsBar = new JPanel();
+		String imgPath = System.getProperty("user.dir") + File.separator + "images" + File.separator;
+
+		JRadioButton rectangle = new JRadioButton(new ImageIcon(imgPath + "rectangle.png"));
+		rectangle.setSelectedIcon(new ImageIcon(imgPath + "rectangleSelect.png"));
+
+		JRadioButton ellipse = new JRadioButton(new ImageIcon(imgPath + "ellipse.png"));
+		ellipse.setSelectedIcon(new ImageIcon(imgPath + "ellipseSelect.png"));
+
+		toolsBar.add(rectangle);
+		toolsBar.add(ellipse);
+
+		colorPalette = new ColorPalette(Color.BLACK);
+		colorPalette.addMouseListener(new MouseAdapter() {
+
+			public void mouseClicked(MouseEvent e) {
+				Color defeaultColor = getBackground();
+				Color selected = JColorChooser.showDialog(App.this,
+						"Palette de Color", defeaultColor);
+
+				if (selected != null) {
+					colorPalette.setColor(selected);
+					drawingPanel.setShapeCurrentColor(selected);
+				}
+			}
+		});
+
+		ButtonGroup group = new ButtonGroup();
+		group.add(rectangle);
+		group.add(ellipse);
+
+		rectangle.setSelected(true);
+		rectangle.addItemListener(new RadioButtonHandler("Rectangle"));
+		ellipse.addItemListener(new RadioButtonHandler("Ellipse"));
+
+		toolsBar.add(colorPalette);
+
+		toolsBar.setPreferredSize(new Dimension(54, 70));
+		toolsBar.setLayout(new FlowLayout(FlowLayout.LEFT, 15, 15));
+
+		this.add(toolsBar, BorderLayout.NORTH);
+	}
+
+	private ActionListener getOpenAction() {
+		return new ActionListener() {
+			@Override
 			public void actionPerformed(ActionEvent e) {
 				JFileChooser fileChooser = new JFileChooser();
 				int result = fileChooser.showOpenDialog(null);
@@ -83,11 +138,11 @@ class DrawingFrame extends JFrame {
 					}
 				}
 			}
-		});
+		};
+	}
 
-		JMenuItem saveItem = new JMenuItem("Save");
-		saveItem.setAccelerator(KeyStroke.getKeyStroke("ctrl S"));
-		saveItem.addActionListener(new ActionListener() {
+	private ActionListener getSaveAction() {
+		return new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
 				JFileChooser fileChooser = new JFileChooser();
 				int result = fileChooser.showSaveDialog(null);
@@ -103,108 +158,54 @@ class DrawingFrame extends JFrame {
 					}
 				}
 			}
-		});
+		};
+	}
 
-		JMenuItem deleteItem = new JMenuItem("Delete");
-		deleteItem.setAccelerator(KeyStroke.getKeyStroke("ctrl C"));
-		deleteItem.addActionListener(new ActionListener() {
+	private ActionListener getDeleteAction() {
+		return new ActionListener() {
 			public void actionPerformed(ActionEvent e) {
-				drawingPanel.clearAllFromShapeListAndSelectedShapeList();
+				drawingPanel.changeSelectionState(new NoSelectionState(drawingPanel));
+				drawingPanel.clearShapesAndSelectedShapes();
 			}
-		});
+		};
+	}
 
-		fileMenu.add(openItem);
-		fileMenu.add(saveItem);
-		fileMenu.addSeparator();
-		fileMenu.add(deleteItem);
-
-		JMenu selectionMenu = new JMenu("Selection");
-		topMenu.add(selectionMenu);
-
-		JMenuItem SelectAllItem = new JMenuItem("Select All");
-		SelectAllItem.setAccelerator(KeyStroke.getKeyStroke("ctrl A"));
-		SelectAllItem.addActionListener(new ActionListener() {
+	private ActionListener getSelectAllAction() {
+		return new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-
-				drawingPanel.selectAllShapes();
+				// drawingPanel.selectAllShapes();
+				drawingPanel.getSelectionState().selectAll();
 			}
-		});
+		};
+	}
 
-		JMenuItem NoSelectionItem = new JMenuItem("No Selection");
-		NoSelectionItem.setAccelerator(KeyStroke.getKeyStroke("ESCAPE"));
-		NoSelectionItem.addActionListener(new ActionListener() {
+	private ActionListener getNoSelectionAction() {
+		return new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				drawingPanel.clearSelectedShapeList();
+				// drawingPanel.clearSelectedShapes();
+				drawingPanel.getSelectionState().clearSelection();
 			}
-		});
+		};
+	}
 
-		JMenuItem coloredSelectionItem = new JMenuItem("Colore selection");
-		coloredSelectionItem.setAccelerator(KeyStroke.getKeyStroke("ctrl R"));
-		selectionMenu.addSeparator();
-		coloredSelectionItem.addActionListener(new ActionListener() {
+	private ActionListener getColoreSelectionAction() {
+		return new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				drawingPanel.coloreAllSelectedShape();
+				drawingPanel.getSelectionState().coloreSelection();
 			}
-		});
+		};
+	}
 
-		JMenuItem deleteSelectionItem = new JMenuItem("Delete");
-		deleteSelectionItem.setAccelerator(KeyStroke.getKeyStroke("BACK_SPACE"));
-		deleteSelectionItem.addActionListener(new ActionListener() {
+	private ActionListener getRemoveSelectionAction() {
+		return new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				drawingPanel.deleteAllOfSelectedShapeList();
+				drawingPanel.getSelectionState().removeSelection();;
 			}
-		});
-
-		selectionMenu.add(SelectAllItem);
-		selectionMenu.add(NoSelectionItem);
-		selectionMenu.add(coloredSelectionItem);
-		selectionMenu.add(deleteSelectionItem);
-
-		JPanel toolsBar = new JPanel();
-		String imgPath = System.getProperty("user.dir") + File.separator + "images" + File.separator;
-
-		JRadioButton rectangle = new JRadioButton(new ImageIcon(imgPath + "rectangle.png"));
-		rectangle.setSelectedIcon(new ImageIcon(imgPath + "rectangleSelect.png"));
-
-		JRadioButton ellipse = new JRadioButton(new ImageIcon(imgPath + "ellipse.png"));
-		ellipse.setSelectedIcon(new ImageIcon(imgPath + "ellipseSelect.png"));
-
-		toolsBar.add(rectangle);
-		toolsBar.add(ellipse);
-
-		colorpalette = new ColorPalette(Color.BLACK);
-		colorpalette.addMouseListener(new MouseAdapter() {
-
-			public void mouseClicked(MouseEvent e) {
-				Color defeaultColor = getBackground();
-				Color selected = JColorChooser.showDialog(DrawingFrame.this,
-						"Palette de Color", defeaultColor);
-
-				if (selected != null) {
-					colorpalette.setColor(selected);
-					drawingPanel.setShapeCurrentColor(selected);
-				}
-			}
-		});
-
-		ButtonGroup group = new ButtonGroup();
-		group.add(rectangle);
-		group.add(ellipse);
-
-		rectangle.setSelected(true);
-		rectangle.addItemListener(new RadioButtonHandler("Rectangle"));
-		ellipse.addItemListener(new RadioButtonHandler("Ellipse"));
-
-		toolsBar.add(colorpalette);
-
-		toolsBar.setPreferredSize(new Dimension(54, 70));
-		toolsBar.setLayout(new FlowLayout(FlowLayout.LEFT, 15, 15));
-
-		this.add(toolsBar, BorderLayout.NORTH);
+		};
 	}
 
 	private class RadioButtonHandler implements ItemListener {
@@ -224,32 +225,4 @@ class DrawingFrame extends JFrame {
 
 	public static final int DEFAULT_WIDTH = 300;
 	public static final int DEFAULT_HEIGHT = 400;
-}
-
-class ColorPalette extends JComponent {
-	private Color color;
-	private Rectangle2D rectangle;
-
-	public ColorPalette(Color color) {
-		super();
-		this.color = color;
-		this.rectangle = new Rectangle2D.Double(5, 5, 15, 15);
-		this.setPreferredSize(new Dimension(20, 20));
-		this.setMaximumSize(new Dimension(25, 25));
-	}
-
-	public void paintComponent(Graphics graphics) {
-		Graphics2D g2 = (Graphics2D) graphics;
-		g2.setPaint(this.color);
-		g2.fill(rectangle);
-	}
-
-	public Color getColor() {
-		return this.color;
-	}
-
-	public void setColor(Color color) {
-		this.color = color;
-		repaint();
-	}
 }
